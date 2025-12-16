@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <title>تقرير المرتبات</title>
+
+    <style>
+      body {
+        font-family: Cairo;
+        background: #f0f8ff;
+        direction: rtl;
+        padding: 20px;
+      }
+
+      .box {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        max-width: 1100px;
+        margin: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      th,
+      td {
+        border: 1px solid #aaa;
+        padding: 8px;
+        text-align: center;
+      }
+
+      th {
+        background: #008cff;
+        color: #fff;
+      }
+
+      button {
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        margin: 5px;
+      }
+
+      .del {
+        background: red;
+      }
+      .pay {
+        background: green;
+      }
+      #printPdf {
+        background: #ff8c00;
+      }
+
+      input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        border: 1px solid #aaa;
+      }
+
+      /* ===== Footer ===== */
+      footer {
+        background: #008cff;
+        color: #fff;
+        text-align: center;
+        padding: 12px;
+        border-radius: 10px;
+        margin-top: 20px;
+        font-size: 14px;
+      }
+      footer a {
+        color: #fff;
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: peru;
+      }
+
+      /* ===== زر العودة ===== */
+      #backBtn {
+        background: #00bfff;
+        color: #fff;
+        font-weight: bold;
+        font-size: 16px;
+        padding: 10px 20px;
+        margin-top: 15px;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      #backBtn:hover {
+        background: #008cff;
+        transform: scale(1.05);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="box" id="reportContent">
+      <h2>📄 تقرير المرتبات</h2>
+      <p
+        id="currentTime"
+        style="text-align: center; color: #555; margin-bottom: 10px"
+      ></p>
+
+      <input id="search" placeholder="🔍 بحث بالاسم" />
+
+      <h3>⚠️ لديهم متبقي</h3>
+      <table id="remain"></table>
+
+      <h3>✅ تم الدفع كامل</h3>
+      <table id="full"></table>
+
+      <h3>💰 أخذوا أكثر من المرتب</h3>
+      <table id="over"></table>
+
+      <div style="margin-top: 10px">
+        <button id="backBtn" onclick="location.href='index.html'">
+          ⬅ عودة
+        </button>
+        <button id="printPdf">تنزيل PDF</button>
+        <button onclick="window.print()">🖨️ طباعة PDF</button>
+      </div>
+    </div>
+
+    <footer>
+      &copy;2025 <a href="">Eyad Abdallah</a> | All rights reserved
+    </footer>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <!-- jsPDF & html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyAu9HDit-G8JllC-wcTmvXx7vchWmNs9ms",
+        authDomain: "ali-eisesy.firebaseapp.com",
+        databaseURL: "https://ali-eisesy-default-rtdb.firebaseio.com",
+        projectId: "ali-eisesy",
+        storageBucket: "ali-eisesy.appspot.com",
+        messagingSenderId: "31241139042",
+        appId: "1:31241139042:web:66b06edcded73616c8f23b",
+      };
+      firebase.initializeApp(firebaseConfig);
+      var db = firebase.database();
+
+      let data = [];
+      let keys = [];
+
+      db.ref("workers").on("value", (snap) => {
+        data = [];
+        keys = [];
+        snap.forEach((c) => {
+          data.push(c.val());
+          keys.push(c.key);
+        });
+        render();
+      });
+
+      // تحديث الوقت الحالي أعلى التقرير
+      function updateTime() {
+        let now = new Date();
+        let options = {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        };
+        document.getElementById("currentTime").innerText =
+          now.toLocaleDateString("ar-EG", options);
+      }
+      updateTime();
+      setInterval(updateTime, 1000);
+
+      function render() {
+        let s = search.value.toLowerCase();
+
+        remain.innerHTML =
+          "<tr><th>الاسم</th><th>المرتب</th><th>المستلم</th><th>المتبقي</th><th>التاريخ والوقت</th><th>إجراء</th></tr>";
+        full.innerHTML =
+          "<tr><th>الاسم</th><th>المرتب</th><th>المستلم</th><th>التاريخ والوقت</th><th>إجراء</th></tr>";
+        over.innerHTML =
+          "<tr><th>الاسم</th><th>المرتب</th><th>المستلم</th><th>الزيادة</th><th>التاريخ والوقت</th><th>إجراء</th></tr>";
+
+        data.forEach((d, i) => {
+          if (s && !d.name.toLowerCase().includes(s)) return;
+
+          if (d.received > d.salary) {
+            over.innerHTML += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.salary}</td>
+        <td>${d.received}</td>
+        <td>${d.received - d.salary}</td>
+        <td>${d.date}</td>
+        <td>
+          <button class="del" onclick="del('${keys[i]}')">مسح</button>
+        </td>
+      </tr>`;
+          } else if (d.remaining > 0) {
+            remain.innerHTML += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.salary}</td>
+        <td>${d.received}</td>
+        <td>${d.remaining}</td>
+        <td>${d.date}</td>
+        <td>
+          <button class="pay" onclick="payMore('${keys[i]}',${d.remaining})">دفع الباقي</button>
+          <button class="del" onclick="del('${keys[i]}')">مسح</button>
+        </td>
+      </tr>`;
+          } else {
+            full.innerHTML += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.salary}</td>
+        <td>${d.received}</td>
+        <td>${d.date}</td>
+        <td>
+          <button class="del" onclick="del('${keys[i]}')">مسح</button>
+        </td>
+      </tr>`;
+          }
+        });
+      }
+
+      function del(key) {
+        if (confirm("مسح هذا السجل؟")) {
+          db.ref("workers/" + key).remove();
+        }
+      }
+
+      function payMore(key) {
+        let add = Number(prompt("المبلغ الإضافي"));
+        if (add <= 0) return;
+        db.ref("workers/" + key).once("value", (snap) => {
+          let d = snap.val();
+          d.received += add;
+          d.remaining = d.salary - d.received;
+          if (d.remaining < 0) d.remaining = 0;
+          d.date = new Date().toLocaleString(); // تحديث التاريخ والوقت بعد الدفع
+          db.ref("workers/" + key).set(d);
+        });
+      }
+
+      search.addEventListener("input", render);
+
+      // ===== تنزيلPDF =====
+      document.getElementById("printPdf").addEventListener("click", () => {
+        const report = document.getElementById("reportContent");
+        html2canvas(report).then((canvas) => {
+          const imgData = canvas.toDataURL("image/png");
+          const pdf = new jspdf.jsPDF("p", "mm", "a4");
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pdf.internal.pageSize.getWidth();
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+          pdf.save("تقرير_المرتبات.pdf");
+        });
+      });
+    </script>
+  </body>
+</html>
